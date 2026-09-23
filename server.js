@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const PORT = 3000;
 const tripsRouter = require('./routes/trips');
+const { sequelize } = require('./models');
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -32,6 +33,10 @@ app.use((err, req, res, next) => {
   }
   res.status(err.status || 500).json({ error: err.message || 'Внутренняя ошибка сервера' });
 });
+
+sequelize.authenticate()
+  .then(() => console.log('БД подключена успешно'))
+  .catch(err => console.error('Ошибка подключения к БД:', err));
 
 app.listen(PORT, () => {
   console.log(`Сервер запущен: http://localhost:${PORT}`);

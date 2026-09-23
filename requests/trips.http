@@ -30,7 +30,8 @@ Content-Type: application/json
   "departureTime": "2025-01-17T09:00:00",
   "workHours": 0,
   "fuelConsumed": 0,
-  "status": "in_progress"
+  "status": "in_progress",
+  "notes": "Новый путевой лист для проверки сохранения заметок."
 }
 
 ### 8. Некорректные данные (ожидаем 400)
@@ -70,7 +71,7 @@ Content-Type: application/json
 }
 
 ### 11. DELETE (200)
-DELETE {{host}}/trips/2
+DELETE {{host}}/trips/4
 
 ### 12. Повторный DELETE (ожидаем 404)
 DELETE {{host}}/trips/2
