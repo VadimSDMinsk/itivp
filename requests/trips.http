@@ -1,0 +1,76 @@
+### Переменная
+@host = http://localhost:3000
+
+### 1. Корень
+GET {{host}}/
+
+### 2. Все путевые листы
+GET {{host}}/trips
+
+### 3. Фильтр по статусу
+GET {{host}}/trips?status=completed
+
+### 4. Фильтр по водителю
+GET {{host}}/trips?driverName=Иванов
+
+### 5. Один по ID
+GET {{host}}/trips/1
+
+### 6. Несуществующий ID (ожидаем 404)
+GET {{host}}/trips/999
+
+### 7. Создать (ожидаем 201)
+POST {{host}}/trips
+Content-Type: application/json
+
+{
+  "driverName": "Сидоров С.С.",
+  "vehicleNumber": "С789МН99",
+  "route": "Москва — Рязань",
+  "departureTime": "2025-01-17T09:00:00",
+  "workHours": 0,
+  "fuelConsumed": 0,
+  "status": "in_progress"
+}
+
+### 8. Некорректные данные (ожидаем 400)
+POST {{host}}/trips
+Content-Type: application/json
+
+{
+  "driverName": "",
+  "vehicleNumber": "X000XX00",
+  "workHours": -5
+}
+
+### 9. PUT — полное обновление (200)
+PUT {{host}}/trips/1
+Content-Type: application/json
+
+{
+  "driverName": "Иванов И.И.",
+  "vehicleNumber": "А123ВС77",
+  "route": "Москва — Тула — Москва",
+  "departureTime": "2025-01-15T08:00:00",
+  "returnTime": "2025-01-15T20:00:00",
+  "workHours": 12,
+  "fuelConsumed": 52.0,
+  "status": "completed"
+}
+
+### 10. PATCH — частичное обновление (200)
+PATCH {{host}}/trips/2
+Content-Type: application/json
+
+{
+  "returnTime": "2025-01-16T19:00:00",
+  "workHours": 11.5,
+  "fuelConsumed": 48.7,
+  "status": "completed"
+}
+
+### 11. DELETE (200)
+DELETE {{host}}/trips/2
+
+### 12. Повторный DELETE (ожидаем 404)
+DELETE {{host}}/trips/2
