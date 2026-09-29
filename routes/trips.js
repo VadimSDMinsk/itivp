@@ -2,12 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/tripsController');
+const { authenticate, isAdmin } = require('../middleware/auth');
 
+router.use(authenticate);
 router.get('/',       ctrl.getAllTrips);
 router.get('/:id',    ctrl.getTripById);
 router.post('/',      ctrl.createTrip);
 router.put('/:id',    ctrl.updateTrip);
 router.patch('/:id',  ctrl.patchTrip);
-router.delete('/:id', ctrl.deleteTrip);
+router.delete('/:id', isAdmin, ctrl.deleteTrip);
 
 module.exports = router;

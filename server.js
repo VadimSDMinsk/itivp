@@ -2,6 +2,8 @@ const express = require('express');
 const app = express();
 const PORT = 3000;
 const tripsRouter = require('./routes/trips');
+const { authRouter, profileRouter } = require('./routes/auth');
+const adminRouter = require('./routes/admin');
 const { sequelize } = require('./models');
 
 app.use(express.json());
@@ -9,11 +11,18 @@ app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
   next();
 });
+app.use('/auth', authRouter);
+app.use('/profile', profileRouter);
+app.use('/admin', adminRouter);
 app.use('/trips', tripsRouter);
 app.get('/', (req, res) => {
   res.json({
     message: 'API системы путевых листов',
     endpoints: [
+      'POST /auth/register',
+      'POST /auth/login',
+      'GET /profile',
+      'GET /admin/users',
       'GET /trips',
       'GET /trips/:id',
       'POST /trips',

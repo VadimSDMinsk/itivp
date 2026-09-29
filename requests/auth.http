@@ -1,0 +1,71 @@
+@host = http://localhost:3000
+
+### Регистрация пользователя
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "new-driver@example.com",
+  "password": "NewDriver123!"
+}
+
+### Вход обычного пользователя из сида
+# @name userLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "driver@example.com",
+  "password": "Driver123!"
+}
+
+### Вход администратора из сида
+# @name adminLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "Admin123!"
+}
+
+### Повторная регистрация (ожидается 409)
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "driver@example.com",
+  "password": "Driver123!"
+}
+
+### Вход с неверным паролем (ожидается 401)
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "driver@example.com",
+  "password": "WrongPassword"
+}
+
+### Профиль обычного пользователя (ожидается 200)
+GET {{host}}/profile
+Authorization: Bearer {{userLogin.response.body.token}}
+
+### Список пользователей (токен администратора, ожидается 200)
+GET {{host}}/admin/users
+Authorization: Bearer {{adminLogin.response.body.token}}
+
+### Путевые листы (токен обычного пользователя, ожидается 200)
+GET {{host}}/trips
+Authorization: Bearer {{userLogin.response.body.token}}
+
+### Путевые листы без токена (ожидается 401)
+GET {{host}}/trips
+
+### Удаление путевого листа администратором (ожидается 200 при наличии id=1)
+DELETE {{host}}/trips/1
+Authorization: Bearer {{adminLogin.response.body.token}}
+
+### Удаление путевого листа обычным пользователем (ожидается 403 при наличии id=2)
+DELETE {{host}}/trips/2
+Authorization: Bearer {{userLogin.response.body.token}}
