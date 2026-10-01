@@ -5,7 +5,7 @@ POST {{host}}/auth/register
 Content-Type: application/json
 
 {
-  "email": "new-driver@example.com",
+  "email": "new-driver-DV@example.com",
   "password": "NewDriver123!"
 }
 
