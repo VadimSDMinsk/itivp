@@ -7,9 +7,9 @@ const { authenticate, isAdmin } = require('../middleware/auth');
 router.use(authenticate);
 router.get('/',       ctrl.getAllTrips);
 router.get('/:id',    ctrl.getTripById);
-router.post('/',      ctrl.createTrip);
-router.put('/:id',    ctrl.updateTrip);
-router.patch('/:id',  ctrl.patchTrip);
+router.post('/',      isAdmin, ctrl.createTrip);
+router.put('/:id',    isAdmin, ctrl.updateTrip);
+router.patch('/:id',  isAdmin, ctrl.patchTrip);
 router.delete('/:id', isAdmin, ctrl.deleteTrip);
 
 module.exports = router;

@@ -6,13 +6,13 @@ const statuses = [
   { value: 'cancelled', label: 'Отменен' }
 ];
 
-function TripForm({ fields, errors, isEditing, onChange, onSubmit, onCancel }) {
+function TripForm({ fields, errors, isEditing, isSubmitting, onChange, onSubmit, onCancel }) {
   const controlClass = (name) => errors[name] ? 'form-control has-error' : 'form-control';
   return (
     <section className="form-panel" aria-labelledby="form-title">
       <div className="form-heading">
         <div><p className="eyebrow">{isEditing ? 'ИЗМЕНЕНИЕ ЗАПИСИ' : 'НОВАЯ ЗАПИСЬ'}</p><h3 id="form-title">{isEditing ? 'Редактировать путевой лист' : 'Добавить путевой лист'}</h3></div>
-        <button className="icon-button close-button" type="button" onClick={onCancel} aria-label="Закрыть форму" title="Закрыть">×</button>
+        <button className="icon-button close-button" type="button" onClick={onCancel} disabled={isSubmitting} aria-label="Закрыть форму" title="Закрыть">×</button>
       </div>
       <form onSubmit={onSubmit} noValidate>
         <div className="form-grid">
@@ -26,7 +26,7 @@ function TripForm({ fields, errors, isEditing, onChange, onSubmit, onCancel }) {
           <label className={controlClass('status')}><span>Статус</span><select name="status" value={fields.status} onChange={onChange}>{statuses.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>{errors.status && <small>{errors.status}</small>}</label>
           <label className="form-control form-control-wide"><span>Примечание</span><textarea name="notes" value={fields.notes} onChange={onChange} rows="3" placeholder="Детали рейса, замечания, документы" /></label>
         </div>
-        <div className="form-actions"><span className="form-hint"><i>*</i> Обязательные поля</span><div><button className="button button-quiet" type="button" onClick={onCancel}>Отмена</button><button className="button button-primary" type="submit">{isEditing ? 'Сохранить изменения' : 'Добавить запись'}</button></div></div>
+        <div className="form-actions"><span className="form-hint"><i>*</i> Обязательные поля</span><div><button className="button button-quiet" type="button" onClick={onCancel} disabled={isSubmitting}>Отмена</button><button className="button button-primary" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Сохранение...' : isEditing ? 'Сохранить изменения' : 'Добавить запись'}</button></div></div>
       </form>
     </section>
   );

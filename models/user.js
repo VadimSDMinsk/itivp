@@ -23,9 +23,9 @@ module.exports = (sequelize, DataTypes) => {
     role: {
       type: DataTypes.STRING,
       allowNull: false,
-      defaultValue: 'user',
+      defaultValue: 'driver',
       validate: {
-        isIn: [['user', 'admin']]
+        isIn: [['driver', 'user', 'admin']]
       }
     },
     createdAt: {

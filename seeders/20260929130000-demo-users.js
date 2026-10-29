@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const { User } = require('../models');
 
 const demoUsers = [
-  { email: 'driver@example.com', password: 'Driver123!', role: 'user' },
+  { email: 'driver@example.com', password: 'Driver123!', role: 'driver' },
   { email: 'admin@example.com', password: 'Admin123!', role: 'admin' }
 ];
 

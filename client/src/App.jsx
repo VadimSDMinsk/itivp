@@ -3,38 +3,20 @@ import TripFilters from './components/TripFilters.jsx';
 import TripForm from './components/TripForm.jsx';
 import TripList from './components/TripList.jsx';
 import TripStats from './components/TripStats.jsx';
+import { ApiError, createTrip, deleteTrip as deleteTripRequest, getTrips, login, updateTrip } from './api.js';
 
-const STORAGE_KEY = 'itivp_lab4_trips';
+const TOKEN_KEY = 'itivp_jwt';
+const USER_KEY = 'itivp_user';
 const VALID_STATUSES = ['in_progress', 'completed', 'cancelled'];
 
-function createDemoTrips() {
-  const at = (offset, hour) => {
-    const date = new Date();
-    date.setDate(date.getDate() + offset);
-    date.setHours(hour, 0, 0, 0);
-    return date.toISOString();
-  };
-  return [
-    { id: 'demo-1', driverName: 'Алексей Морозов', vehicleNumber: 'А482МР 799', route: 'Москва — Тула — Москва', departureTime: at(-1, 7), returnTime: at(-1, 18), workHours: 10.5, fuelConsumed: 48.2, status: 'completed', notes: 'Доставка оборудования, документы сданы.' },
-    { id: 'demo-2', driverName: 'Ирина Волкова', vehicleNumber: 'Е315КТ 77', route: 'Москва — Ярославль', departureTime: at(0, 8), returnTime: '', workHours: 5, fuelConsumed: 31.6, status: 'in_progress', notes: 'Плановый рейс.' },
-    { id: 'demo-3', driverName: 'Дмитрий Соколов', vehicleNumber: 'М907ВХ 50', route: 'Москва — Калуга', departureTime: at(-2, 9), returnTime: '', workHours: 0, fuelConsumed: 0, status: 'cancelled', notes: 'Рейс отменен по погодным условиям.' }
-  ];
-}
-
-function isTripArray(value) {
-  return Array.isArray(value) && value.every((trip) => (
-    trip && typeof trip === 'object'
-    && (typeof trip.id === 'string' || typeof trip.id === 'number')
-    && typeof trip.driverName === 'string'
-    && typeof trip.vehicleNumber === 'string'
-    && typeof trip.route === 'string'
-    && typeof trip.departureTime === 'string' && !Number.isNaN(Date.parse(trip.departureTime))
-    && typeof trip.returnTime === 'string' && (!trip.returnTime || !Number.isNaN(Date.parse(trip.returnTime)))
-    && Number.isFinite(trip.workHours) && trip.workHours >= 0
-    && Number.isFinite(trip.fuelConsumed) && trip.fuelConsumed >= 0
-    && VALID_STATUSES.includes(trip.status)
-    && typeof trip.notes === 'string'
-  ));
+function getStoredSession() {
+  try {
+    const token = window.sessionStorage.getItem(TOKEN_KEY);
+    const user = JSON.parse(window.sessionStorage.getItem(USER_KEY));
+    return token && user && typeof user.role === 'string' ? { token, user } : null;
+  } catch {
+    return null;
+  }
 }
 
 function emptyForm() {
@@ -51,79 +33,161 @@ function localDateTime(value) {
   return date.toISOString().slice(0, 16);
 }
 
+function errorMessage(error) {
+  if (error instanceof ApiError && error.status === 401) return 'Сеанс завершён или токен недействителен. Войдите снова.';
+  if (error instanceof ApiError && error.status === 403) return 'Недостаточно прав для выполнения этой операции.';
+  return error.message || 'Не удалось выполнить запрос.';
+}
+
 function App() {
+  const [session, setSession] = useState(getStoredSession);
+  const token = session?.token || null;
+  const user = session?.user || null;
+  const isAdmin = user?.role === 'admin';
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [items, setItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(Boolean(token));
+  const [loadError, setLoadError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const [formFields, setFormFields] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [notice, setNotice] = useState('');
-  const [storageError, setStorageError] = useState('');
-  const [isLoaded, setIsLoaded] = useState(false);
-  const loadedRef = useRef(false);
+  const [noticeIsError, setNoticeIsError] = useState(false);
+  const [pendingIds, setPendingIds] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const requestVersion = useRef(0);
 
   useEffect(() => {
-    let initialItems = createDemoTrips();
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored !== null) {
-        const parsed = JSON.parse(stored);
-        if (isTripArray(parsed)) initialItems = parsed;
-      }
-    } catch {
-      setStorageError('Не удалось прочитать сохраненные данные. Загружены демонстрационные записи.');
-    }
-    setItems(initialItems);
-    setIsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (isLoaded) loadedRef.current = true;
-  }, [isLoaded]);
-
-  useEffect(() => {
-    if (!loadedRef.current) return undefined;
-    const timeoutId = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-        setStorageError('');
-      } catch {
-        setStorageError('Не удалось сохранить данные в этом браузере.');
-      }
-    }, 500);
+    const timeoutId = window.setTimeout(() => setDebouncedQuery(searchQuery.trim().toLocaleLowerCase('ru')), 300);
     return () => window.clearTimeout(timeoutId);
-  }, [items]);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!token) {
+      setItems([]);
+      setIsLoading(false);
+      setLoadError('');
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const version = ++requestVersion.current;
+    setIsLoading(true);
+    setLoadError('');
+    getTrips(token, { signal: controller.signal })
+      .then((trips) => {
+        if (version === requestVersion.current) setItems(trips);
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError' || version !== requestVersion.current) return;
+        if (error instanceof ApiError && error.status === 401) {
+          window.sessionStorage.removeItem(TOKEN_KEY);
+          window.sessionStorage.removeItem(USER_KEY);
+          setSession(null);
+          setNotice(errorMessage(error));
+          return;
+        }
+        setLoadError(errorMessage(error));
+      })
+      .finally(() => {
+        if (version === requestVersion.current) setIsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [token, retryCount]);
 
   useEffect(() => {
     document.title = `Путевые листы (${items.length}) | Диспетчерская`;
   }, [items.length]);
 
   const visibleItems = items.filter((trip) => {
-    const query = searchQuery.trim().toLocaleLowerCase('ru');
-    const matchesSearch = !query || trip.driverName.toLocaleLowerCase('ru').includes(query)
-      || trip.vehicleNumber.toLocaleLowerCase('ru').includes(query);
+    const matchesSearch = !debouncedQuery
+      || trip.driverName.toLocaleLowerCase('ru').includes(debouncedQuery)
+      || trip.vehicleNumber.toLocaleLowerCase('ru').includes(debouncedQuery);
     return matchesSearch && (statusFilter === 'all' || trip.status === statusFilter);
   });
 
+  async function handleLogin(event) {
+    event.preventDefault();
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      const response = await login(loginEmail.trim(), loginPassword);
+      window.sessionStorage.setItem(TOKEN_KEY, response.token);
+      window.sessionStorage.setItem(USER_KEY, JSON.stringify(response.user));
+      setLoginPassword('');
+      setItems([]);
+      setIsLoading(true);
+      setSession({ token: response.token, user: response.user });
+      setNotice('');
+      setNoticeIsError(false);
+    } catch (error) {
+      setLoginError(error.message || 'Не удалось войти. Повторите попытку.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }
+
+  function handleLogout(message = '') {
+    window.sessionStorage.removeItem(TOKEN_KEY);
+    window.sessionStorage.removeItem(USER_KEY);
+    setSession(null);
+    setItems([]);
+    setNotice(message);
+    setNoticeIsError(Boolean(message));
+    setLoadError('');
+    setIsFormOpen(false);
+    setEditingId(null);
+  }
+
+  function handleProtectedError(error) {
+    const message = errorMessage(error);
+    if (error instanceof ApiError && error.status === 401) {
+      handleLogout(message);
+    } else {
+      setNotice(message);
+      setNoticeIsError(true);
+    }
+  }
+
   function createTripForm() {
+    if (!isAdmin) return;
     setEditingId(null);
     setFormFields(emptyForm());
     setFormErrors({});
     setNotice('');
+    setNoticeIsError(false);
     setIsFormOpen(true);
   }
 
   function editTripForm(trip) {
+    if (!isAdmin || pendingIds.includes(trip.id)) return;
     setEditingId(trip.id);
-    setFormFields({ ...trip, departureTime: localDateTime(trip.departureTime), returnTime: localDateTime(trip.returnTime), workHours: String(trip.workHours), fuelConsumed: String(trip.fuelConsumed) });
+    setFormFields({
+      ...trip,
+      route: trip.route || '',
+      notes: trip.notes || '',
+      departureTime: localDateTime(trip.departureTime),
+      returnTime: localDateTime(trip.returnTime),
+      workHours: String(trip.workHours),
+      fuelConsumed: String(trip.fuelConsumed)
+    });
     setFormErrors({});
     setNotice('');
+    setNoticeIsError(false);
     setIsFormOpen(true);
   }
 
   function closeForm() {
+    if (isSubmitting) return;
     setIsFormOpen(false);
     setEditingId(null);
     setFormErrors({});
@@ -135,8 +199,9 @@ function App() {
     setFormErrors((current) => ({ ...current, [name]: '' }));
   }
 
-  function handleFormSubmit(event) {
+  async function handleFormSubmit(event) {
     event.preventDefault();
+    if (!isAdmin || isSubmitting) return;
     const errors = {};
     if (!formFields.driverName.trim()) errors.driverName = 'Укажите ФИО водителя.';
     if (!formFields.vehicleNumber.trim()) errors.vehicleNumber = 'Укажите номер автомобиля.';
@@ -153,39 +218,101 @@ function App() {
       return;
     }
 
-    const trip = {
-      id: editingId ?? (globalThis.crypto?.randomUUID?.() ?? `trip-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    const payload = {
       driverName: formFields.driverName.trim(),
       vehicleNumber: formFields.vehicleNumber.trim().toLocaleUpperCase('ru'),
       route: formFields.route.trim(),
       departureTime: new Date(formFields.departureTime).toISOString(),
-      returnTime: formFields.returnTime ? new Date(formFields.returnTime).toISOString() : '',
-      workHours, fuelConsumed, status: formFields.status, notes: formFields.notes.trim()
+      returnTime: formFields.returnTime ? new Date(formFields.returnTime).toISOString() : null,
+      workHours,
+      fuelConsumed,
+      status: formFields.status,
+      notes: formFields.notes.trim() || null
     };
-    if (editingId !== null) {
-      setItems((current) => current.map((item) => item.id === editingId ? trip : item));
-      setNotice('Изменения путевого листа сохранены.');
-    } else {
-      setItems((current) => [trip, ...current]);
-      setNotice('Путевой лист добавлен.');
-    }
-    setIsFormOpen(false);
-    setEditingId(null);
+
+    setIsSubmitting(true);
     setFormErrors({});
+    setNotice('');
+    if (editingId !== null) {
+      const original = items.find((item) => item.id === editingId);
+      if (!original) {
+        setIsSubmitting(false);
+        setNotice('Редактируемая запись больше не найдена. Обновите список.');
+        return;
+      }
+      setPendingIds((current) => [...current, editingId]);
+      setItems((current) => current.map((item) => item.id === editingId ? { ...item, ...payload } : item));
+      try {
+        const updated = await updateTrip(token, editingId, payload);
+        setItems((current) => current.map((item) => item.id === editingId ? updated : item));
+        setNotice('Изменения путевого листа сохранены.');
+        setNoticeIsError(false);
+        setIsFormOpen(false);
+        setEditingId(null);
+      } catch (error) {
+        setItems((current) => current.map((item) => item.id === editingId ? original : item));
+        handleProtectedError(error);
+      } finally {
+        setPendingIds((current) => current.filter((id) => id !== editingId));
+        setIsSubmitting(false);
+      }
+    } else {
+      const temporaryId = `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const optimisticTrip = { id: temporaryId, ...payload, notes: payload.notes || '', returnTime: payload.returnTime || '', workHours, fuelConsumed };
+      setPendingIds((current) => [...current, temporaryId]);
+      setItems((current) => [optimisticTrip, ...current]);
+      try {
+        const created = await createTrip(token, payload);
+        setItems((current) => current.map((item) => item.id === temporaryId ? created : item));
+        setNotice('Путевой лист создан на сервере.');
+        setNoticeIsError(false);
+        setIsFormOpen(false);
+      } catch (error) {
+        setItems((current) => current.filter((item) => item.id !== temporaryId));
+        handleProtectedError(error);
+      } finally {
+        setPendingIds((current) => current.filter((id) => id !== temporaryId));
+        setIsSubmitting(false);
+      }
+    }
   }
 
-  function deleteTrip(trip) {
+  async function handleDeleteTrip(trip) {
+    if (!isAdmin) return;
+    if (String(trip.id).startsWith('temp-')) {
+      setNotice('Дождитесь сохранения путевого листа перед удалением.');
+      return;
+    }
+    if (pendingIds.includes(trip.id)) return;
     if (!window.confirm(`Удалить путевой лист водителя ${trip.driverName}?`)) return;
+    const originalIndex = items.findIndex((item) => item.id === trip.id);
+    if (originalIndex < 0) return;
+    setPendingIds((current) => [...current, trip.id]);
     setItems((current) => current.filter((item) => item.id !== trip.id));
-    setNotice('Путевой лист удален.');
-    if (editingId === trip.id) closeForm();
+    setNotice('');
+    setNoticeIsError(false);
+    try {
+      await deleteTripRequest(token, trip.id);
+      setNotice('Путевой лист удалён.');
+      setNoticeIsError(false);
+    } catch (error) {
+      setItems((current) => {
+        if (current.some((item) => item.id === trip.id)) return current;
+        const restored = [...current];
+        restored.splice(Math.min(originalIndex, restored.length), 0, trip);
+        return restored;
+      });
+      handleProtectedError(error);
+    } finally {
+      setPendingIds((current) => current.filter((id) => id !== trip.id));
+    }
   }
 
   return (
     <main className="app-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Линия, главная"><span className="brand-mark">П</span><span>Линия<span className="brand-period">.</span></span></a>
-        <div className="topbar-meta"><span className="live-dot" />Локальный учет</div>
+        <div className="topbar-meta"><span className="live-dot" />{token ? 'Серверный учет' : 'Вход в систему'}</div>
       </header>
 
       <section className="page-intro" id="top">
@@ -194,24 +321,43 @@ function App() {
           <h1>Рабочая смена<br /><span>под контролем.</span></h1>
           <p className="intro-copy">Путевые листы и рабочее время водителей в одном месте.</p>
         </div>
-        <div className="intro-aside" aria-hidden="true"><span className="aside-number">04</span><span className="aside-caption">ЖУРНАЛ<br />РЕЙСОВ</span></div>
+        <div className="intro-aside" aria-hidden="true"><span className="aside-number">05</span><span className="aside-caption">ЖУРНАЛ<br />РЕЙСОВ</span></div>
       </section>
 
-      <section aria-label="Сводка по путевым листам"><TripStats items={items} /></section>
+      {!token ? (
+        <section className="login-panel" aria-labelledby="login-title">
+          <p className="eyebrow">АВТОРИЗАЦИЯ</p>
+          <h2 id="login-title">Войти в систему</h2>
+          {notice && <p className="message message-error" role="alert">{notice}</p>}
+          {loginError && <p className="message message-error" role="alert">{loginError}</p>}
+          <form className="login-form" onSubmit={handleLogin}>
+            <label className="form-control"><span>Email</span><input type="email" autoComplete="username" required value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} /></label>
+            <label className="form-control"><span>Пароль</span><input type="password" autoComplete="current-password" required value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} /></label>
+            <button className="button button-primary" type="submit" disabled={isLoggingIn}>{isLoggingIn ? 'Вход...' : 'Войти'}</button>
+          </form>
+        </section>
+      ) : (
+        <>
+          {!isLoading && !loadError && <section aria-label="Сводка по путевым листам"><TripStats items={items} /></section>}
+          <section className="workspace" aria-label="Журнал путевых листов">
+            <div className="section-heading">
+              <div><p className="eyebrow">ТЕКУЩИЙ ЖУРНАЛ</p><h2>Путевые листы <span className="count-pill">{items.length}</span></h2></div>
+              <div className="heading-actions">{isAdmin && <button className="button button-primary" type="button" onClick={createTripForm}><span className="button-icon">+</span>Новый путевой лист</button>}<button className="button button-quiet" type="button" onClick={() => handleLogout()}>Выйти</button></div>
+            </div>
+            {notice && <p className={`message ${noticeIsError ? 'message-error' : 'message-success'}`} role={noticeIsError ? 'alert' : 'status'}>{notice}</p>}
+            {loadError && <p className="message message-error" role="alert">{loadError}<button className="button button-quiet retry-button" type="button" onClick={() => { setLoadError(''); setIsLoading(true); setRetryCount((count) => count + 1); }}>Повторить</button></p>}
+            {isLoading ? <p className="load-state" role="status">Загрузка путевых листов...</p> : loadError ? null : (
+              <>
+                {isAdmin && isFormOpen && <TripForm fields={formFields} errors={formErrors} isEditing={editingId !== null} isSubmitting={isSubmitting} onChange={handleFormChange} onSubmit={handleFormSubmit} onCancel={closeForm} />}
+                <TripFilters searchQuery={searchQuery} statusFilter={statusFilter} onSearchChange={setSearchQuery} onStatusChange={setStatusFilter} />
+                <TripList items={visibleItems} hasItems={items.length > 0} canManage={isAdmin} pendingIds={pendingIds} onEdit={editTripForm} onDelete={handleDeleteTrip} onCreate={createTripForm} />
+              </>
+            )}
+          </section>
+        </>
+      )}
 
-      <section className="workspace" aria-label="Журнал путевых листов">
-        <div className="section-heading">
-          <div><p className="eyebrow">ТЕКУЩИЙ ЖУРНАЛ</p><h2>Путевые листы <span className="count-pill">{items.length}</span></h2></div>
-          <button className="button button-primary" type="button" onClick={createTripForm}><span className="button-icon">+</span>Новый путевой лист</button>
-        </div>
-        {storageError && <p className="message message-error" role="alert">{storageError}</p>}
-        {notice && <p className="message message-success" role="status">{notice}</p>}
-        {isFormOpen && <TripForm fields={formFields} errors={formErrors} isEditing={editingId !== null} onChange={handleFormChange} onSubmit={handleFormSubmit} onCancel={closeForm} />}
-        <TripFilters searchQuery={searchQuery} statusFilter={statusFilter} onSearchChange={setSearchQuery} onStatusChange={setStatusFilter} />
-        <TripList items={visibleItems} hasItems={items.length > 0} onEdit={editTripForm} onDelete={deleteTrip} onCreate={createTripForm} />
-      </section>
-
-      <footer className="page-footer"><span>ЛИНИЯ / УЧЕТ ПУТЕВЫХ ЛИСТОВ</span><span>Хранение в этом браузере · {isLoaded ? 'данные загружены' : 'загрузка данных'}</span></footer>
+      <footer className="page-footer"><span>ЛИНИЯ / УЧЕТ ПУТЕВЫХ ЛИСТОВ</span><span>{token ? 'Данные загружаются из сервера' : 'Войдите для доступа к журналу'}</span></footer>
     </main>
   );
 }
