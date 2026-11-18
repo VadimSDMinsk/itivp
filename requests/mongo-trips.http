@@ -1,0 +1,87 @@
+@host = http://localhost:3000
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDQ4Mzg2NCwiZXhwIjoxNzk0NDg3NDY0fQ.U9v3cPi-2EqAwXWac0C6305d_e-pLhME_ywrTO6uZQY
+@tripId = PASTE_MONGODB_OBJECT_ID_HERE
+
+### Получить все путевые листы (достаточно токена авторизованного пользователя)
+GET {{host}}/mongo/trips
+Authorization: Bearer {{token}}
+
+### Создать путевой лист с несколькими остановками (только администратор)
+POST {{host}}/mongo/trips
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "driverName": "Петрович",
+  "vehicleNumber": "9999ВС5",
+  "route": "Москва — Тула — Москва",
+  "departureTime": "2026-11-12T06:00:00.000Z",
+  "status": "in_progress",
+  "stops": [
+    {
+      "name": "Тула",
+      "arrivalTime": "2026-11-12T09:00:00.000Z",
+      "departureTime": "2026-11-12T09:30:00.000Z",
+      "notes": "Погрузка"
+    },
+    {
+      "name": "Серпухов",
+      "arrivalTime": "2026-11-12T11:00:00.000Z",
+      "notes": "Промежуточная остановка"
+    }
+  ]
+}
+
+### Получить один документ
+GET {{host}}/mongo/trips/{{tripId}}
+Authorization: Bearer {{token}}
+
+### Полностью заменить документ (только администратор)
+PUT {{host}}/mongo/trips/{{tripId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "driverName": "Иванов Иван Иванович",
+  "vehicleNumber": "А123ВС77",
+  "route": "Москва — Тула",
+  "departureTime": "2026-11-12T06:00:00.000Z",
+  "returnTime": "2026-11-12T13:00:00.000Z",
+  "workHours": 7,
+  "fuelConsumed": 24.5,
+  "status": "completed",
+  "notes": "Полностью обновлённый путевой лист",
+  "stops": [
+    {
+      "name": "Тула",
+      "arrivalTime": "2026-11-12T09:00:00.000Z",
+      "departureTime": "2026-11-12T09:30:00.000Z"
+    }
+  ]
+}
+
+### Частично обновить документ (только администратор)
+PATCH {{host}}/mongo/trips/{{tripId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "completed",
+  "workHours": 7.5
+}
+
+### Добавить остановку (только администратор)
+POST {{host}}/mongo/trips/{{tripId}}/stops
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Калуга",
+  "arrivalTime": "2026-11-12T12:00:00.000Z",
+  "departureTime": "2026-11-12T12:15:00.000Z",
+  "notes": "Заправка"
+}
+
+### Удалить документ (только администратор)
+DELETE {{host}}/mongo/trips/{{tripId}}
+Authorization: Bearer {{token}}
