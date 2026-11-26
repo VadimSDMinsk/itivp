@@ -14,6 +14,30 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand-period { color: var(--orange); }
 .topbar-meta { display: flex; align-items: center; gap: 9px; color: #667066; font-size: 12px; font-weight: 600; }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #70a77b; box-shadow: 0 0 0 4px rgb(112 167 123 / 13%); }
+.notifications { position: relative; flex: 0 0 auto; margin-left: 3px; }
+.notifications-toggle { position: relative; display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--green-dark); }
+.notifications-toggle:hover { border-color: #bfc9bd; background: #f8f9f5; }
+.notifications-toggle svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
+.notifications-count { position: absolute; top: -6px; right: -6px; display: grid; min-width: 18px; height: 18px; padding: 0 4px; place-items: center; border: 2px solid var(--surface); border-radius: 10px; background: var(--orange); color: white; font-size: 9px; font-weight: 700; line-height: 1; }
+.notifications-panel { position: absolute; z-index: 20; top: calc(100% + 11px); right: 0; width: min(390px, calc(100vw - 28px)); max-height: min(620px, calc(100vh - 100px)); overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); box-shadow: 0 16px 42px rgb(37 52 40 / 16%); color: var(--ink); text-align: left; }
+.notifications-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 17px 13px; border-bottom: 1px solid #eef0eb; }
+.notifications-heading .eyebrow { margin-bottom: 4px; }
+.notifications-heading h2 { margin: 0; font: 700 17px Manrope, sans-serif; }
+.notifications-read-all { min-height: 32px; margin: 0; padding: 0 9px; font-size: 10px; }
+.notifications-error { display: grid; gap: 8px; padding: 12px 16px; background: #fcf0ed; color: #9a453a; font-size: 11px; }
+.notifications-error .button { justify-self: start; min-height: 30px; margin: 0; }
+.notifications-state { margin: 0; padding: 28px 16px; color: #818a80; font-size: 12px; text-align: center; }
+.notifications-list { max-height: min(500px, calc(100vh - 220px)); margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.notification-item { padding: 13px 16px 12px; border-bottom: 1px solid #eff1ec; }
+.notification-item:last-child { border-bottom: 0; }
+.notification-unread { border-left: 3px solid var(--orange); background: #fffaf4; }
+.notification-item-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.notification-item h3 { margin: 0; color: #29342b; font: 700 12px Manrope, sans-serif; line-height: 1.4; }
+.notification-item > p { margin: 6px 0 10px; color: #667066; font-size: 11px; font-weight: 400; line-height: 1.5; }
+.notification-unread-dot { width: 7px; height: 7px; flex: 0 0 7px; margin-top: 4px; border-radius: 50%; background: var(--orange); }
+.notification-item-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #92998f; font-size: 9px; }
+.notification-read-button { padding: 2px 0; border: 0; background: transparent; color: var(--green); font-size: 10px; font-weight: 700; }
+.notification-read-button:hover { color: var(--green-dark); text-decoration: underline; }
 .page-intro { position: relative; display: flex; min-height: 255px; align-items: flex-end; justify-content: space-between; padding: 46px 0 34px; overflow: hidden; }
 .eyebrow { margin: 0 0 12px; color: #7b857b; font-size: 10px; font-weight: 700; letter-spacing: 1.25px; }
 .page-intro h1 { margin: 0; color: var(--green-dark); font-family: Manrope, sans-serif; font-size: clamp(38px, 5vw, 62px); font-weight: 700; line-height: 1.04; }
@@ -108,6 +132,10 @@ button:disabled { cursor: not-allowed; opacity: .6; }
 }
 @media (max-width: 560px) {
   .app-shell { width: calc(100% - 28px); } .topbar { height: 62px; }
+  .notifications-toggle { width: 34px; height: 34px; }
+  .notifications-panel { right: -4px; width: min(370px, calc(100vw - 28px)); }
+  .notifications-heading { align-items: flex-start; flex-direction: column; }
+  .notifications-read-all { align-self: flex-end; }
   .page-intro { min-height: 205px; padding: 35px 0 27px; } .page-intro h1 { font-size: 39px; }
   .intro-copy { max-width: 260px; font-size: 12px; line-height: 1.5; } .intro-aside { right: -27px; bottom: -10px; } .aside-number { font-size: 100px; } .aside-caption { display: none; }
   .stats-grid { gap: 8px; } .stat-card { min-height: 126px; padding: 14px 12px; } .stat-topline { min-height: 28px; gap: 4px; font-size: 10px; } .stat-value { margin-top: 10px; font-size: 29px; } .stat-bottomline { margin-top: 9px; font-size: 10px; }

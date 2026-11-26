@@ -1,12 +1,25 @@
+const http = require('http');
 const express = require('express');
+const { Server } = require('socket.io');
 const app = express();
 const PORT = 3000;
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: false
+  }
+});
 const tripsRouter = require('./routes/trips');
 const { authRouter, profileRouter } = require('./routes/auth');
 const adminRouter = require('./routes/admin');
+const notificationsRouter = require('./routes/notifications');
 const { sequelize } = require('./models');
 const mongoTripsRouter = require('./mongo/routes/trips');
 const { connectMongoDB } = require('./mongo/config/database');
+const initializeSocket = require('./sockets');
+
+initializeSocket(io);
+app.set('io', io);
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -16,6 +29,7 @@ app.use((req, res, next) => {
 app.use('/auth', authRouter);
 app.use('/profile', profileRouter);
 app.use('/admin', adminRouter);
+app.use('/notifications', notificationsRouter);
 app.use('/trips', tripsRouter);
 app.use('/mongo/trips', mongoTripsRouter);
 app.get('/', (req, res) => {
@@ -26,6 +40,10 @@ app.get('/', (req, res) => {
       'POST /auth/login',
       'GET /profile',
       'GET /admin/users',
+      'GET /notifications',
+      'GET /notifications/unread-count',
+      'PATCH /notifications/:id/read',
+      'PATCH /notifications/read-all',
       'GET /trips',
       'GET /trips/:id',
       'POST /trips',
@@ -59,6 +77,6 @@ sequelize.authenticate()
 
 connectMongoDB();
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Сервер запущен: http://localhost:${PORT}`);
 });

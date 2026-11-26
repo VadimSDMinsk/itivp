@@ -42,5 +42,23 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'users'
   });
 
+  User.associate = models => {
+    User.hasMany(models.Trip, {
+      as: 'drivenTrips',
+      foreignKey: 'driverUserId',
+      onDelete: 'SET NULL'
+    });
+    User.hasMany(models.Notification, {
+      as: 'receivedNotifications',
+      foreignKey: 'recipientUserId',
+      onDelete: 'RESTRICT'
+    });
+    User.hasMany(models.Notification, {
+      as: 'authoredNotifications',
+      foreignKey: 'actorUserId',
+      onDelete: 'SET NULL'
+    });
+  };
+
   return User;
 };

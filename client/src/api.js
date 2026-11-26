@@ -84,3 +84,41 @@ export async function updateTrip(token, id, trip) {
 export async function deleteTrip(token, id) {
   return request(`/trips/${encodeURIComponent(id)}`, { method: 'DELETE', token });
 }
+
+export async function getNotifications(token, { signal } = {}) {
+  const response = await request('/notifications', { token, signal });
+  if (!Array.isArray(response?.data)) {
+    throw new ApiError('Сервер вернул список уведомлений в неверном формате.');
+  }
+  return response.data;
+}
+
+export async function getUnreadNotificationCount(token, { signal } = {}) {
+  const response = await request('/notifications/unread-count', { token, signal });
+  if (!Number.isSafeInteger(response?.unreadCount) || response.unreadCount < 0) {
+    throw new ApiError('Сервер вернул количество уведомлений в неверном формате.');
+  }
+  return response.unreadCount;
+}
+
+export async function markNotificationRead(token, id) {
+  const response = await request(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: 'PATCH',
+    token
+  });
+  if (!response?.data || String(response.data.id) !== String(id)) {
+    throw new ApiError('Сервер не подтвердил прочтение уведомления.');
+  }
+  return response.data;
+}
+
+export async function markAllNotificationsRead(token) {
+  const response = await request('/notifications/read-all', {
+    method: 'PATCH',
+    token
+  });
+  if (!Number.isSafeInteger(response?.updatedCount) || response.updatedCount < 0) {
+    throw new ApiError('Сервер вернул результат прочтения уведомлений в неверном формате.');
+  }
+  return response.updatedCount;
+}

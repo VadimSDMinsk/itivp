@@ -7,6 +7,11 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
+    driverUserId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'driver_user_id'
+    },
     driverName: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -78,6 +83,14 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'trips'
   });
+
+  Trip.associate = models => {
+    Trip.belongsTo(models.User, {
+      as: 'driver',
+      foreignKey: 'driverUserId',
+      onDelete: 'SET NULL'
+    });
+  };
 
   return Trip;
 };

@@ -3,11 +3,15 @@ import TripFilters from './components/TripFilters.jsx';
 import TripForm from './components/TripForm.jsx';
 import TripList from './components/TripList.jsx';
 import TripStats from './components/TripStats.jsx';
+import Notifications from './components/Notifications.jsx';
 import { ApiError, createTrip, deleteTrip as deleteTripRequest, getTrips, login, updateTrip } from './api.js';
+import { connectSocket, disconnectSocket } from './socket.js';
 
 const TOKEN_KEY = 'itivp_jwt';
 const USER_KEY = 'itivp_user';
 const VALID_STATUSES = ['in_progress', 'completed', 'cancelled'];
+const SOCKET_ERROR_NOTICE = 'Не удалось подключиться к каналу реального времени.';
+const SOCKET_DISCONNECT_NOTICE = 'Соединение реального времени потеряно. Выполняется переподключение.';
 
 function getStoredSession() {
   try {
@@ -61,6 +65,7 @@ function App() {
   const [formErrors, setFormErrors] = useState({});
   const [notice, setNotice] = useState('');
   const [noticeIsError, setNoticeIsError] = useState(false);
+  const [socketNotice, setSocketNotice] = useState('');
   const [pendingIds, setPendingIds] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const requestVersion = useRef(0);
@@ -69,6 +74,38 @@ function App() {
     const timeoutId = window.setTimeout(() => setDebouncedQuery(searchQuery.trim().toLocaleLowerCase('ru')), 300);
     return () => window.clearTimeout(timeoutId);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!token) {
+      disconnectSocket();
+      return undefined;
+    }
+
+    const socket = connectSocket(token);
+    if (!socket) return undefined;
+
+    const handleConnect = () => {
+      setSocketNotice('');
+    };
+    const handleConnectError = () => {
+      setSocketNotice(SOCKET_ERROR_NOTICE);
+    };
+    const handleDisconnect = reason => {
+      if (reason !== 'io client disconnect') {
+        setSocketNotice(SOCKET_DISCONNECT_NOTICE);
+      }
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('connect_error', handleConnectError);
+    socket.on('disconnect', handleDisconnect);
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('connect_error', handleConnectError);
+      socket.off('disconnect', handleDisconnect);
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
@@ -137,6 +174,7 @@ function App() {
   }
 
   function handleLogout(message = '') {
+    disconnectSocket();
     window.sessionStorage.removeItem(TOKEN_KEY);
     window.sessionStorage.removeItem(USER_KEY);
     setSession(null);
@@ -312,7 +350,7 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Линия, главная"><span className="brand-mark">П</span><span>Линия<span className="brand-period">.</span></span></a>
-        <div className="topbar-meta"><span className="live-dot" />{token ? 'Серверный учет' : 'Вход в систему'}</div>
+        <div className="topbar-meta"><span className="live-dot" />{token ? 'Серверный учет' : 'Вход в систему'}{token && <Notifications token={token} />}</div>
       </header>
 
       <section className="page-intro" id="top">
@@ -328,6 +366,7 @@ function App() {
         <section className="login-panel" aria-labelledby="login-title">
           <p className="eyebrow">АВТОРИЗАЦИЯ</p>
           <h2 id="login-title">Войти в систему</h2>
+          {socketNotice && <p className="message message-error" role="alert">{socketNotice}</p>}
           {notice && <p className="message message-error" role="alert">{notice}</p>}
           {loginError && <p className="message message-error" role="alert">{loginError}</p>}
           <form className="login-form" onSubmit={handleLogin}>
@@ -344,6 +383,7 @@ function App() {
               <div><p className="eyebrow">ТЕКУЩИЙ ЖУРНАЛ</p><h2>Путевые листы <span className="count-pill">{items.length}</span></h2></div>
               <div className="heading-actions">{isAdmin && <button className="button button-primary" type="button" onClick={createTripForm}><span className="button-icon">+</span>Новый путевой лист</button>}<button className="button button-quiet" type="button" onClick={() => handleLogout()}>Выйти</button></div>
             </div>
+            {socketNotice && <p className="message message-error" role="alert">{socketNotice}</p>}
             {notice && <p className={`message ${noticeIsError ? 'message-error' : 'message-success'}`} role={noticeIsError ? 'alert' : 'status'}>{notice}</p>}
             {loadError && <p className="message message-error" role="alert">{loadError}<button className="button button-quiet retry-button" type="button" onClick={() => { setLoadError(''); setIsLoading(true); setRetryCount((count) => count + 1); }}>Повторить</button></p>}
             {isLoading ? <p className="load-state" role="status">Загрузка путевых листов...</p> : loadError ? null : (

@@ -7,7 +7,12 @@ export default defineConfig({
       '/auth': 'http://localhost:3000',
       '/trips': 'http://localhost:3000',
       '/profile': 'http://localhost:3000',
-      '/admin': 'http://localhost:3000'
+      '/admin': 'http://localhost:3000',
+      '/notifications': 'http://localhost:3000',
+      '/socket.io': {
+        target: 'http://localhost:3000',
+        ws: true
+      }
     }
   }
 });

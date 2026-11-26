@@ -1,4 +1,8 @@
-const { Trip, Sequelize } = require('../models');
+const { Trip, Sequelize, sequelize } = require('../models');
+const {
+  createTripNotifications,
+  emitSavedNotifications
+} = require('../services/notificationService');
 
 const { Op } = Sequelize;
 
@@ -85,52 +89,84 @@ exports.createTrip = async (req, res, next) => {
       return res.status(400).json({ error: 'Некорректные данные запроса', details: errors });
     }
 
-    const newTrip = await Trip.create(req.body);
-    res.status(201).json({ message: 'Путевой лист успешно создан', data: newTrip });
+    const io = req.app.get('io');
+    if (!io) {
+      return res.status(503).json({ error: 'Сервис уведомлений временно недоступен' });
+    }
+
+    const result = await sequelize.transaction(async transaction => {
+      const newTrip = await Trip.create(req.body, { transaction });
+      const notifications = await createTripNotifications({
+        trip: newTrip,
+        actorUserId: req.user.id,
+        type: 'trip_created',
+        transaction
+      });
+
+      return { trip: newTrip, notifications };
+    });
+
+    emitSavedNotifications(io, result.notifications);
+    res.status(201).json({ message: 'Путевой лист успешно создан', data: result.trip });
   } catch (error) {
     handleSequelizeError(error, res, next);
   }
 };
 
-exports.updateTrip = async (req, res, next) => {
+async function updateTrip(req, res, next, isPatch) {
   try {
-    const existing = await Trip.findByPk(req.params.id);
-    if (!existing) {
-      return res.status(404).json({ error: `Путевой лист с id=${req.params.id} не найден` });
-    }
-
-    const errors = validateTripData(req.body, false);
+    const errors = validateTripData(req.body, isPatch);
     if (errors.length > 0) {
       return res.status(400).json({ error: 'Некорректные данные запроса', details: errors });
     }
 
-    await Trip.update(req.body, { where: { id: req.params.id }, returning: true });
-    const updated = await Trip.findByPk(req.params.id);
-    res.status(200).json({ message: 'Путевой лист полностью обновлён', data: updated });
-  } catch (error) {
-    handleSequelizeError(error, res, next);
-  }
-};
+    const io = req.app.get('io');
+    if (!io) {
+      return res.status(503).json({ error: 'Сервис уведомлений временно недоступен' });
+    }
 
-exports.patchTrip = async (req, res, next) => {
-  try {
-    const existing = await Trip.findByPk(req.params.id);
-    if (!existing) {
+    const result = await sequelize.transaction(async transaction => {
+      const existing = await Trip.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!existing) return null;
+
+      const previousStatus = existing.status;
+      await Trip.update(req.body, {
+        where: { id: req.params.id },
+        returning: true,
+        transaction
+      });
+      const updated = await Trip.findByPk(req.params.id, { transaction });
+      const type = previousStatus !== 'completed' && updated.status === 'completed'
+        ? 'trip_completed'
+        : 'trip_updated';
+      const notifications = await createTripNotifications({
+        trip: updated,
+        actorUserId: req.user.id,
+        type,
+        transaction
+      });
+
+      return { trip: updated, notifications };
+    });
+
+    if (!result) {
       return res.status(404).json({ error: `Путевой лист с id=${req.params.id} не найден` });
     }
 
-    const errors = validateTripData(req.body, true);
-    if (errors.length > 0) {
-      return res.status(400).json({ error: 'Некорректные данные запроса', details: errors });
-    }
-
-    await Trip.update(req.body, { where: { id: req.params.id }, returning: true });
-    const updated = await Trip.findByPk(req.params.id);
-    res.status(200).json({ message: 'Путевой лист частично обновлён', data: updated });
+    emitSavedNotifications(io, result.notifications);
+    const message = isPatch ? 'Путевой лист частично обновлён' : 'Путевой лист полностью обновлён';
+    res.status(200).json({ message, data: result.trip });
   } catch (error) {
     handleSequelizeError(error, res, next);
   }
-};
+}
+
+exports.updateTrip = (req, res, next) => updateTrip(req, res, next, false);
+
+exports.patchTrip = (req, res, next) => updateTrip(req, res, next, true);
 
 exports.deleteTrip = async (req, res, next) => {
   try {
