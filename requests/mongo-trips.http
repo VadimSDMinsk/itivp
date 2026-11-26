@@ -1,5 +1,5 @@
 @host = http://localhost:3000
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDQ4Mzg2NCwiZXhwIjoxNzk0NDg3NDY0fQ.U9v3cPi-2EqAwXWac0C6305d_e-pLhME_ywrTO6uZQY
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NTAyODkzMSwiZXhwIjoxNzk1MDMyNTMxfQ.0mq2HE1lgxCN9p-dNIETwk7zf3jbfTuUgvjxevmaW10
 @tripId = PASTE_MONGODB_OBJECT_ID_HERE
 
 ### Получить все путевые листы (достаточно токена авторизованного пользователя)
